@@ -1,0 +1,57 @@
+plugins {
+    id 'java-gradle-plugin'
+    id 'maven-publish'
+    id 'com.jfrog.artifactory' version '5.1.14'
+    id 'org.jetbrains.kotlin.jvm' version '1.9.22'
+}
+
+group 'ru.ok.byteweaver'
+version '0.1.0-rc.1'
+
+gradlePlugin {
+    plugins {
+        simplePlugin {
+            id = 'ru.ok.byteweaver'
+            implementationClass = 'ru.ok.byteweaver.plugin.ByteweaverPlugin'
+        }
+    }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+dependencies {
+    implementation gradleApi()
+
+    implementation 'com.android.tools.build:gradle:8.2.2'
+    implementation 'org.ow2.asm:asm:9.5'
+    implementation 'org.ow2.asm:asm-util:9.5'
+    implementation 'org.ow2.asm:asm-commons:9.5'
+
+    testImplementation 'junit:junit:4.13.2'
+}
+
+sourceSets.test {
+    java.srcDirs += 'src/sample/java'
+    resources.srcDirs += 'src/sample/resources'
+}
+
+artifactory {
+    contextUrl = project.hasProperty('artifactoryUrl') ? project['artifactoryUrl'] : 'https://art.at.odkl.ru/artifactory/'
+    publish {
+        repository {
+            repoKey = 'android-repo'
+            username = project.hasProperty('artifactoryUsername') ? project['artifactoryUsername'] : null
+            password = project.hasProperty('artifactoryPassword') ? project['artifactoryPassword'] : null
+        }
+        publishBuildInfo = false
+    }
+}
+
+afterEvaluate {
+    artifactoryPublish {
+        publications('pluginMaven', 'simplePluginPluginMarkerMaven')
+    }
+}

@@ -1,0 +1,11 @@
+pluginManagement {
+    repositories {
+        maven { url 'https://art.at.odkl.ru/artifactory/at-repo' }
+    }
+}
+dependencyResolutionManagement {
+    repositories {
+        maven { url 'https://art.at.odkl.ru/artifactory/at-repo' }
+    }
+}
+include(':byteweaver-plugin')
