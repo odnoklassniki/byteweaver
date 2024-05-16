@@ -19,7 +19,7 @@ class ConfigParserTest {
 
         assertEquals("*", activityClassBlock.namePattern.toString())
         assertEquals(listOf("android.app.Activity"), activityClassBlock.ancestorNames.map(ClassName::toString))
-        assertEquals(1, activityClassBlock.methodBlocks.size)
+        assertEquals(2, activityClassBlock.methodBlocks.size)
 
         val onCreateMethodBlock = activityClassBlock.methodBlocks.first()
 

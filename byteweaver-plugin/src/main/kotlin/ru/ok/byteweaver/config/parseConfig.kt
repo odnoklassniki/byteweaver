@@ -76,7 +76,7 @@ private fun parseClassInto(
     val methodBlocks = mutableListOf<MethodBlock>()
 
     for (s in statement.block) {
-        if (parseMethodInto(s, imports, methodBlocks)) continue
+        if (parseMethodInto(s, imports, ancestorNames, methodBlocks)) continue
         else throw unknownStatementException(s)
     }
 
@@ -94,6 +94,7 @@ private val METHOD_PATTERN: Pattern = Pattern.compile("(.+) (.+)\\(((?:.+,)*.+)?
 private fun parseMethodInto(
         statement: Statement,
         imports: Map<String, String>,
+        ancestorNames: List<ClassName>,
         outMethodBlocks: MutableList<MethodBlock>,
 ): Boolean {
     val annotationPatterns = statement.annotations.map { parseAnnotation(imports, it) }
@@ -127,6 +128,7 @@ private fun parseMethodInto(
     outMethodBlocks += MethodBlock(
             annotationPatterns = annotationPatterns,
             namePattern = namePattern,
+            classAncestorNames = ancestorNames,
             descPattern = MethodDescPattern(
                     returnTypePattern = returnTypePattern,
                     parameterTypePatterns = parameterTypePatterns,

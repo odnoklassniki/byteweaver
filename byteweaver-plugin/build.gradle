@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'ru.ok.byteweaver'
-version '0.1.0-rc.1'
+version '0.1.0-rc.2'
 
 gradlePlugin {
     plugins {
@@ -26,9 +26,9 @@ dependencies {
     implementation gradleApi()
 
     implementation 'com.android.tools.build:gradle:8.2.2'
-    implementation 'org.ow2.asm:asm:9.5'
-    implementation 'org.ow2.asm:asm-util:9.5'
-    implementation 'org.ow2.asm:asm-commons:9.5'
+    implementation 'org.ow2.asm:asm:9.7'
+    implementation 'org.ow2.asm:asm-util:9.7'
+    implementation 'org.ow2.asm:asm-commons:9.7'
 
     testImplementation 'junit:junit:4.13.2'
 }

@@ -9,7 +9,6 @@ import com.android.build.gradle.internal.utils.setDisallowChanges
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.UnknownDomainObjectException
-import ru.ok.byteweaver.transform.AfterMethodBodyVisitor
 
 class ByteweaverPlugin : Plugin<Project> {
     override fun apply(project: Project) {
@@ -39,9 +38,7 @@ class ByteweaverPlugin : Plugin<Project> {
                 variant.instrumentation.transformClassesWith(ByteweaverAsmClassVisitorFactory::class.java, InstrumentationScope.ALL) { parameters ->
                     parameters.srcFiles.setDisallowChanges(srcFiles)
                 }
-                if (AfterMethodBodyVisitor.AFTER_MEANS_FINALLY) {
-                    variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COMPUTE_FRAMES_FOR_INSTRUMENTED_METHODS)
-                }
+                variant.instrumentation.setAsmFramesComputationMode(FramesComputationMode.COMPUTE_FRAMES_FOR_INSTRUMENTED_METHODS)
             }
         }
     }

@@ -3,6 +3,7 @@ package ru.ok.byteweaver.transform
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import ru.ok.byteweaver.config.CallBlock
+import ru.ok.byteweaver.config.ClassName
 import ru.ok.byteweaver.config.ForwardParameter
 import ru.ok.byteweaver.config.Op
 import ru.ok.byteweaver.config.Operation
@@ -12,6 +13,7 @@ class ReplaceCallMethodVisitor(
         api: Int = Opcodes.ASM6,
         mv: MethodVisitor?,
         override val transformLocation: TransformLocation,
+        private val checkAncestorNames: List<ClassName>?,
         override val callBlock: CallBlock,
         override val operation: Operation,
 ) : MethodCallVisitor(api, mv) {

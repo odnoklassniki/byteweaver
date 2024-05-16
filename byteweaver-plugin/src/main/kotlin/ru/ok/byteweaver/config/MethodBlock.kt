@@ -3,6 +3,7 @@ package ru.ok.byteweaver.config
 class MethodBlock(
         val annotationPatterns: List<AnnotationPattern>,
         val namePattern: NamePattern,
+        val classAncestorNames: List<ClassName>,
         val descPattern: MethodDescPattern,
         val operations: List<Operation>,
         val callBlocks: List<CallBlock>,

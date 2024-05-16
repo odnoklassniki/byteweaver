@@ -1,106 +1,199 @@
 package ru.ok.byteweaver.transform
 
-import org.objectweb.asm.Handle
 import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
+import ru.ok.byteweaver.config.ClassName
+import ru.ok.byteweaver.config.Op
+import ru.ok.byteweaver.config.Operation
+import ru.ok.byteweaver.config.TraceParameter
+import ru.ok.byteweaver.util.THROWABLE_JVM_NAME
+import ru.ok.byteweaver.util.VOID_JVM_DESC
 
-abstract class MethodBodyVisitor(
-        api: Int = Opcodes.ASM6,
-        mv: MethodVisitor?,
+class MethodBodyVisitor(
+    api: Int = Opcodes.ASM6,
+    mv: MethodVisitor,
+    override val transformLocation: TransformLocation,
+    private val operations: List<Operation>,
+    private val checkAncestorNames: List<ClassName>?,
 ) : TransformMethodVisitor(api, mv) {
-    open fun beforeVisitFirstInsn() = Unit
 
-    open fun beforeVisitLastInsn(opcode: Int) = Unit
+    init {
+        for (operation in operations) {
+            when (operation.op) {
+                Op.BEFORE -> {
+                    check(operation.returnTypeName.jvmDesc == VOID_JVM_DESC)
+                    if (operation.parameters.isNotEmpty()) {
+                        check(operation.parameters.size == 1)
+                        check(operation.parameters.first() == TraceParameter)
+                    }
+                }
 
-    private var visitedInsn = false
+                Op.AFTER -> {
+                    check(operation.returnTypeName.jvmDesc == VOID_JVM_DESC)
+                    check(operation.parameters.isEmpty())
+                }
 
-    @Suppress("NOTHING_TO_INLINE")
-    private inline fun visitSomeInsn() {
-        if (visitedInsn) {
-            return
+                Op.REPLACE -> TODO("Replacing method body not yet supported")
+            }
         }
-        visitedInsn = true
-        beforeVisitFirstInsn()
     }
 
-    override fun visitIntInsn(opcode: Int, operand: Int) {
-        visitSomeInsn()
-        super.visitIntInsn(opcode, operand)
+    private val hasOperationsBefore = operations.any { it.op == Op.BEFORE }
+    private val hasOperationsAfter = operations.any { it.op == Op.AFTER }
+
+    private val labelStart = if (hasOperationsBefore) Label() else null
+    private val labelTry = if (hasOperationsAfter) Label() else null
+    private val labelCatchBlock = if (hasOperationsAfter) Label() else null
+    private val labelBeforeBlock = if (hasOperationsBefore) Label() else null
+    private var veryFirstLineNumber: Int? = null
+
+    override fun visitLineNumber(line: Int, start: Label?) {
+        if (veryFirstLineNumber == null) {
+            veryFirstLineNumber = line
+        }
+        super.visitLineNumber(line, start)
     }
 
-    override fun visitVarInsn(opcode: Int, `var`: Int) {
-        visitSomeInsn()
-        super.visitVarInsn(opcode, `var`)
-    }
-
-    override fun visitTypeInsn(opcode: Int, type: String?) {
-        visitSomeInsn()
-        super.visitTypeInsn(opcode, type)
-    }
-
-    override fun visitFieldInsn(opcode: Int, owner: String, name: String, descriptor: String) {
-        visitSomeInsn()
-        super.visitFieldInsn(opcode, owner, name, descriptor)
-    }
-
-    override fun visitMethodInsn(opcode: Int, declaringClassJvmName: String, methodName: String, methodJvmDesc: String, isInterface: Boolean) {
-        visitSomeInsn()
-        super.visitMethodInsn(opcode, declaringClassJvmName, methodName, methodJvmDesc, isInterface)
-    }
-
-    override fun visitInvokeDynamicInsn(name: String?, descriptor: String?, bootstrapMethodHandle: Handle?, vararg bootstrapMethodArguments: Any?) {
-        visitSomeInsn()
-        super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, *bootstrapMethodArguments)
-    }
-
-    override fun visitJumpInsn(opcode: Int, label: Label?) {
-        visitSomeInsn()
-        super.visitJumpInsn(opcode, label)
-    }
-
-    override fun visitLdcInsn(value: Any?) {
-        visitSomeInsn()
-        super.visitLdcInsn(value)
-    }
-
-    override fun visitIincInsn(`var`: Int, increment: Int) {
-        visitSomeInsn()
-        super.visitIincInsn(`var`, increment)
-    }
-
-    override fun visitTableSwitchInsn(min: Int, max: Int, dflt: Label?, vararg labels: Label?) {
-        visitSomeInsn()
-        super.visitTableSwitchInsn(min, max, dflt, *labels)
-    }
-
-    override fun visitLookupSwitchInsn(dflt: Label?, keys: IntArray?, labels: Array<out Label>?) {
-        visitSomeInsn()
-        super.visitLookupSwitchInsn(dflt, keys, labels)
-    }
-
-    override fun visitMultiANewArrayInsn(descriptor: String?, numDimensions: Int) {
-        visitSomeInsn()
-        super.visitMultiANewArrayInsn(descriptor, numDimensions)
-    }
-
-    override fun visitLabel(label: Label?) {
-        visitSomeInsn()
-        super.visitLabel(label)
+    override fun visitCode() {
+        if (labelStart != null && labelBeforeBlock != null) {
+            super.visitJumpInsn(Opcodes.GOTO, labelBeforeBlock)
+            super.visitLabel(labelStart)
+            if (transformLocation.version >= Opcodes.V1_6) {
+                super.visitFrame(Opcodes.F_SAME, 0, null, 0, null)
+            }
+        }
+        if (labelTry != null && labelCatchBlock != null) {
+            super.visitTryCatchBlock(labelTry, labelCatchBlock, labelCatchBlock, THROWABLE_JVM_NAME)
+            super.visitLabel(labelTry)
+        }
+        super.visitCode()
     }
 
     override fun visitInsn(opcode: Int) {
-        visitSomeInsn()
         when (opcode) {
-            Opcodes.RETURN,
-            Opcodes.ARETURN,
-            Opcodes.DRETURN,
-            Opcodes.FRETURN,
-            Opcodes.IRETURN,
-            Opcodes.LRETURN,
-            Opcodes.ATHROW,
-            -> beforeVisitLastInsn(opcode)
+            Opcodes.RETURN, Opcodes.ARETURN, Opcodes.DRETURN, Opcodes.FRETURN, Opcodes.IRETURN, Opcodes.LRETURN -> visitAfter()
         }
         super.visitInsn(opcode)
+    }
+
+    override fun visitMaxs(maxStack: Int, maxLocals: Int) {
+        if (labelCatchBlock != null) {
+            super.visitLabel(labelCatchBlock)
+            if (transformLocation.version >= Opcodes.V1_6) {
+                super.visitFrame(Opcodes.F_SAME1, 0, null, 1, ARRAY_OF_THROWABLE_JVM_NAME)
+            }
+            visitAfter()
+            visitInsn(Opcodes.ATHROW)
+        }
+        if (labelStart != null && labelBeforeBlock != null) {
+            super.visitLabel(labelBeforeBlock)
+            if (transformLocation.version >= Opcodes.V1_6) {
+                super.visitFrame(Opcodes.F_SAME, 0, null, 0, null)
+            }
+            visitBefore()
+            super.visitJumpInsn(Opcodes.GOTO, labelStart)
+        }
+        super.visitMaxs(
+            maxStack.coerceAtLeast(1 + if (checkAncestorNames.isNullOrEmpty()) 0 else 1),
+            maxLocals
+        )
+    }
+
+    private fun visitBefore() {
+        if (!checkAncestorNames.isNullOrEmpty()) {
+            val successLabel = Label()
+            for (checkAncestorName in checkAncestorNames) {
+                super.visitVarInsn(Opcodes.ALOAD, 0)
+                super.visitTypeInsn(Opcodes.INSTANCEOF, checkAncestorName.jvmName)
+                super.visitJumpInsn(Opcodes.IFEQ, successLabel)
+            }
+            super.visitJumpInsn(Opcodes.GOTO, labelStart)
+            super.visitLabel(successLabel)
+            if (transformLocation.version >= Opcodes.V1_6) {
+                super.visitFrame(Opcodes.F_SAME, 0, null, 0, null)
+            }
+        }
+        for (operation in operations) {
+            if (operation.op != Op.BEFORE) {
+                continue
+            }
+            val methodJvmDesc = when {
+                operation.parameters.isEmpty() -> "()V"
+                else -> "(Ljava/lang/String;)V"
+            }
+            if (operation.parameters.isNotEmpty()) {
+                assert(operation.parameters.size == 1)
+                assert(operation.parameters.first() == TraceParameter)
+                super.visitLdcInsn(composeTraceString())
+            }
+            super.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                operation.declaringClassName.jvmName,
+                operation.methodName.name,
+                methodJvmDesc,
+                false,
+            )
+        }
+    }
+
+    private fun visitAfter() {
+        val failLabel: Label?
+        if (!checkAncestorNames.isNullOrEmpty()) {
+            failLabel = Label()
+            val successLabel = Label()
+            for (checkAncestorName in checkAncestorNames) {
+                super.visitVarInsn(Opcodes.ALOAD, 0)
+                super.visitTypeInsn(Opcodes.INSTANCEOF, checkAncestorName.jvmName)
+                super.visitJumpInsn(Opcodes.IFEQ, successLabel)
+            }
+            super.visitJumpInsn(Opcodes.GOTO, failLabel)
+            super.visitLabel(successLabel)
+            if (transformLocation.version >= Opcodes.V1_6) {
+                super.visitFrame(Opcodes.F_SAME, 0, null, 0, null)
+            }
+        } else {
+            failLabel = null
+        }
+        for (operation in operations.asReversed()) {
+            if (operation.op != Op.AFTER) {
+                continue
+            }
+            super.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                operation.declaringClassName.jvmName,
+                operation.methodName.name,
+                "()V",
+                false,
+            )
+        }
+        if (failLabel != null) {
+            super.visitLabel(failLabel)
+            if (transformLocation.version >= Opcodes.V1_6) {
+                super.visitFrame(Opcodes.F_SAME, 0, null, 0, null)
+            }
+        }
+    }
+
+    private fun composeTraceString() = buildString {
+        append(transformLocation.declaringClassJavaName)
+        append('.')
+        append(transformLocation.methodName)
+        if (transformLocation.fileName != null) {
+            append('(')
+            append(transformLocation.fileName)
+            val veryFirstLineNumber = veryFirstLineNumber
+            if (veryFirstLineNumber != null && veryFirstLineNumber >= 0) {
+                append(':')
+                append(veryFirstLineNumber)
+            }
+            append(')')
+        } else {
+            append("(Unknown Source)")
+        }
+    }
+
+    companion object {
+        private val ARRAY_OF_THROWABLE_JVM_NAME = arrayOf(THROWABLE_JVM_NAME)
     }
 }

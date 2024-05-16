@@ -4,8 +4,10 @@ import org.objectweb.asm.AnnotationVisitor
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
+import org.objectweb.asm.commons.TryCatchBlockSorter
 import ru.ok.byteweaver.config.AnnotationPattern
 import ru.ok.byteweaver.config.ClassBlock
+import ru.ok.byteweaver.config.ClassName
 import ru.ok.byteweaver.config.MethodBlock
 import ru.ok.byteweaver.config.Op
 
@@ -15,9 +17,13 @@ class TransformClassVisitor(
         private val classBlocks: List<ClassBlock>,
         private val filterClassName: Boolean = true,
         private val filterClassAnnotations: Boolean = true,
+        private val knownSuperClassJavaNames: List<String>? = null,
+        private val knownInterfaceJavaNames: List<String>? = null,
 ) : ClassVisitor(api, cv) {
     private var version: Int = -1
     private lateinit var classJvmName: String
+    private var superClassJvmName: String? = null
+    private var interfaceJvmNames: Array<out String>? = null
     private var fileName: String? = null
     private var enclosingClassJvmName: String? = null
     private var enclosingMethodName: String? = null
@@ -28,6 +34,8 @@ class TransformClassVisitor(
 
         this.version = version
         this.classJvmName = jvmName
+        this.superClassJvmName = superJvmName
+        this.interfaceJvmNames = interfaceJvmNames
     }
 
     override fun visitAnnotation(descriptor: String, visible: Boolean): AnnotationVisitor {
@@ -83,12 +91,17 @@ class TransformClassVisitor(
                 enclosingClassJvmName = enclosingClassJvmName,
                 enclosingMethodName = enclosingMethodName,
                 declaringClassJvmName = classJvmName,
+                superClassJvmName = superClassJvmName,
+                interfaceJvmNames = interfaceJvmNames,
+                knownSuperClassJavaNames = knownSuperClassJavaNames,
+                knownInterfaceJavaNames = knownInterfaceJavaNames,
                 methodName = name,
                 methodJvmDesc = jvmDesc,
                 fileName = fileName,
                 version = version,
         )
-        return FilterMethodVisitor(api, mv, transformLocation, methodBlocks)
+        val sortMv = TryCatchBlockSorter(mv, access, name, jvmDesc, signature, exceptions)
+        return FilterMethodVisitor(api, sortMv, transformLocation, methodBlocks)
     }
 
     private class FilterMethodVisitor(
@@ -117,22 +130,22 @@ class TransformClassVisitor(
                 if (!methodBlock.annotationPatterns.allJvmDescsMatchAny(annotationJvmDescs)) {
                     continue
                 }
-                for (operation in methodBlock.operations.asReversed()) {
-                    mv = when (operation.op) {
-                        Op.BEFORE -> BeforeMethodBodyVisitor(
-                                api,
-                                mv,
-                                transformLocation,
-                                operation,
-                        )
-                        Op.AFTER -> AfterMethodBodyVisitor(
-                                api,
-                                mv,
-                                transformLocation,
-                                operation,
-                        )
-                        Op.REPLACE -> TODO()
-                    }
+                val ancestorNames = methodBlock.classAncestorNames
+                if (ancestorNames.isNotEmpty() && ancestorNames.all { transformLocation.isDefinitelyNotDescendantOf(it) }) {
+                    continue
+                }
+                val checkAncestorNames = when {
+                    ancestorNames.any { transformLocation.isDefinitelyDescendantOf(it) } -> null
+                    else -> ancestorNames
+                }
+                if (methodBlock.operations.isNotEmpty()) {
+                    mv = MethodBodyVisitor(
+                        api,
+                        mv,
+                        transformLocation,
+                        methodBlock.operations,
+                        checkAncestorNames,
+                    )
                 }
                 for (callBlock in methodBlock.callBlocks.asReversed()) {
                     for (operation in callBlock.operations.asReversed()) {
@@ -143,6 +156,7 @@ class TransformClassVisitor(
                                     api,
                                     mv,
                                     transformLocation,
+                                    checkAncestorNames,
                                     callBlock,
                                     operation,
                             )
@@ -155,6 +169,27 @@ class TransformClassVisitor(
     }
 
     companion object {
+        private fun TransformLocation.isDefinitelyDescendantOf(className: ClassName): Boolean {
+            val jvmName = className.jvmName
+            val javaName = className.javaName
+            return when {
+                jvmName == declaringClassJvmName -> true
+                jvmName == superClassJvmName -> true
+                interfaceJvmNames != null && jvmName in interfaceJvmNames -> true
+                knownSuperClassJavaNames != null && javaName in knownSuperClassJavaNames -> true
+                knownInterfaceJavaNames != null && javaName in knownInterfaceJavaNames -> true
+                else -> false
+            }
+        }
+
+        private fun TransformLocation.isDefinitelyNotDescendantOf(className: ClassName): Boolean {
+            val javaName = className.javaName
+            return when {
+                knownInterfaceJavaNames != null && knownSuperClassJavaNames != null -> javaName !in knownSuperClassJavaNames && javaName !in knownInterfaceJavaNames
+                else -> false
+            }
+        }
+
         private fun List<AnnotationPattern>.allJvmDescsMatchAny(annoJvmDescs: List<String>): Boolean {
             return all { annoPattern ->
                 annoJvmDescs.any { annoJvmDesc ->

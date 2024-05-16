@@ -37,6 +37,8 @@ abstract class ByteweaverAsmClassVisitorFactory : AsmClassVisitorFactory<Bytewea
                     classBlocks = classBlocks,
                     filterClassName = false,
                     filterClassAnnotations = false,
+                    knownSuperClassJavaNames = classContext.currentClassData.superClasses,
+                    knownInterfaceJavaNames = classContext.currentClassData.interfaces,
             )
         }
         return nextClassVisitor

@@ -2,10 +2,15 @@ package ru.ok.byteweaver.transform
 
 import com.example.ExampleActivity
 import com.example.ExampleAutoTrace
+import com.example.ExampleCall
+import com.example.ExampleCallDelegate
+import com.example.ExampleNonActivity
 import com.example.ExampleNotification
 import com.example.ExamplePreferences
 import com.example.ExampleRunnable
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
@@ -27,17 +32,43 @@ import java.io.StringWriter
 import java.lang.AssertionError
 
 class TransformClassVisitorTest {
-    private val classBlocks: List<ClassBlock> = mutableListOf<ClassBlock>()
-            .apply {
-                addAll(parseConfig("example-notification.conf"))
-                addAll(parseConfig("example-trace.conf"))
-                addAll(parseConfig("example-preferences.conf"))
-            }
+    private val classBlocks: List<ClassBlock> = listOf(
+        "example-call.conf",
+        "example-notification.conf",
+        "example-trace.conf",
+        "example-preferences.conf",
+    ).flatMap(::parseConfig)
+
+    @Test
+    fun testCall() {
+        val classLoader = BytesClassLoader(
+            "com.example.ExampleCall" to ExampleCall::class.java.transform(classBlocks),
+            "com.example.ExampleCallDelegate" to ExampleCallDelegate::class.java.bytes,
+        )
+
+        val exampleClass = classLoader.loadClass("com.example.ExampleCall")
+        val exampleConstructor = exampleClass.getConstructor()
+        val exampleMethod = exampleClass.getMethod("method")
+        val exampleSomeOtherMethodCalled = exampleClass.getField("someOtherMethodCalled")
+        val exampleInstance = exampleConstructor.newInstance()
+
+        exampleMethod.invoke(exampleInstance)
+
+        assertFalse(exampleSomeOtherMethodCalled[exampleInstance] as Boolean)
+
+        val exampleDelegateClass = classLoader.loadClass("com.example.ExampleCallDelegate")
+        val exampleDelegateBeforeMethodCalled = exampleDelegateClass.getField("beforeMethodCalled")
+        val exampleDelegateAfterMethodCalled = exampleDelegateClass.getField("afterMethodCalled")
+        val exampleDelegateReplaceSomeOtherMethodCalled = exampleDelegateClass.getField("replaceSomeOtherMethodCalled")
+
+        assertTrue(exampleDelegateBeforeMethodCalled[null] as Boolean)
+        assertTrue(exampleDelegateAfterMethodCalled[null] as Boolean)
+        assertTrue(exampleDelegateReplaceSomeOtherMethodCalled[null] as Boolean)
+    }
 
     @Test
     fun testActivity() {
-        val old = ExampleActivity::class.java.bytes
-        val new = transform(old, classBlocks)
+        val new = ExampleActivity::class.java.transform(classBlocks)
 
         val actual = asm(new)
         val expected = resource("ExampleActivity-transformed.asm").text()
@@ -47,9 +78,41 @@ class TransformClassVisitorTest {
     }
 
     @Test
+    fun testActivityNoAncestors() {
+        val new = ExampleActivity::class.java.transform(classBlocks, collectAncestors = false)
+
+        val actual = asm(new)
+        val expected = resource("ExampleActivity-transformed-no-ancestors.asm").text()
+
+        assertWellFormed(ClassReader(new), javaClass.classLoader)
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun testNonActivity() {
+        val new = ExampleNonActivity::class.java.transform(classBlocks)
+
+        val actual = asm(new)
+        val expected = resource("ExampleNonActivity-transformed.asm").text()
+
+        assertWellFormed(ClassReader(new), javaClass.classLoader)
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun testNonActivityNoAncestors() {
+        val new = ExampleNonActivity::class.java.transform(classBlocks, collectAncestors = false)
+
+        val actual = asm(new)
+        val expected = resource("ExampleNonActivity-transformed-no-ancestors.asm").text()
+
+        assertWellFormed(ClassReader(new), javaClass.classLoader)
+        assertEquals(expected, actual)
+    }
+
+    @Test
     fun testAutoTrace() {
-        val old = ExampleAutoTrace::class.java.bytes
-        val new = transform(old, classBlocks)
+        val new = ExampleAutoTrace::class.java.transform(classBlocks)
 
         val actual = asm(new)
         val expected = resource("ExampleAutoTrace-transformed.asm").text()
@@ -60,8 +123,7 @@ class TransformClassVisitorTest {
 
     @Test
     fun testNotification() {
-        val old = ExampleNotification::class.java.bytes
-        val new = transform(old, classBlocks)
+        val new = ExampleNotification::class.java.transform(classBlocks)
 
         val actual = asm(new)
         val expected = resource("ExampleNotification-transformed.asm").text()
@@ -72,8 +134,7 @@ class TransformClassVisitorTest {
 
     @Test
     fun testPreferences() {
-        val old = ExamplePreferences::class.java.bytes
-        val new = transform(old, classBlocks)
+        val new = ExamplePreferences::class.java.transform(classBlocks)
 
         val actual = asm(new)
         val expected = resource("ExamplePreferences-transformed.asm").text()
@@ -84,8 +145,7 @@ class TransformClassVisitorTest {
 
     @Test
     fun testPreferencesImpl() {
-        val old = FastSharedPreferences::class.java.bytes
-        val new = transform(old, classBlocks)
+        val new = FastSharedPreferences::class.java.transform(classBlocks)
 
         val actual = asm(new)
         val expected = resource("ExamplePreferencesImpl-transformed.asm").text()
@@ -96,8 +156,7 @@ class TransformClassVisitorTest {
 
     @Test
     fun testRunnable() {
-        val old = ExampleRunnable::class.java.bytes
-        val new = transform(old, classBlocks)
+        val new = ExampleRunnable::class.java.transform(classBlocks)
 
         val actual = asm(new)
         val expected = resource("ExampleRunnable-transformed.asm").text()
@@ -114,10 +173,21 @@ private fun parseConfig(name: String) = resource(name)
 private val Class<*>.bytes
     get() = resource(name.replace('.', '/') + ".class").bytes()
 
-private fun transform(source: ByteArray, classBlocks: List<ClassBlock>): ByteArray {
-    val cr = ClassReader(source)
+private fun Class<*>.transform(
+    classBlocks: List<ClassBlock>,
+    collectAncestors: Boolean = true,
+): ByteArray {
+    val knownSuperClassJavaNames = if (collectAncestors) collectSuperClasses().map { it.name } else null
+    val knownInterfaceJavaNames = if (collectAncestors) interfaces.map { it.name } else null
+    val cr = ClassReader(bytes)
     val cw = ClassWriter(cr, 0x0)
-    val cv = TransformClassVisitor(Opcodes.ASM6, cw, classBlocks)
+    val cv = TransformClassVisitor(
+        Opcodes.ASM6,
+        cw,
+        classBlocks,
+        knownSuperClassJavaNames = knownSuperClassJavaNames,
+        knownInterfaceJavaNames = knownInterfaceJavaNames
+    )
     cr.accept(cv, 0x0)
     return cw.toByteArray()
 }
@@ -136,18 +206,20 @@ private fun assertWellFormed(
 ) {
     val classNode = ClassNode()
     classReader.accept(
-            CheckClassAdapter(classNode, false),
-            ClassReader.SKIP_DEBUG)
-    val syperType = if (classNode.superName == null) null else Type.getObjectType(classNode.superName)
+        CheckClassAdapter(classNode, true),
+        ClassReader.SKIP_DEBUG
+    )
+    val superType = if (classNode.superName == null) null else Type.getObjectType(classNode.superName)
     val methods = classNode.methods
     val interfaces = classNode.interfaces
             .map { Type.getObjectType(it) }
     for (method in methods) {
         val verifier = SimpleVerifier(
-                Type.getObjectType(classNode.name),
-                syperType,
-                interfaces,
-                classNode.access and Opcodes.ACC_INTERFACE != 0)
+            Type.getObjectType(classNode.name),
+            superType,
+            interfaces,
+            classNode.access and Opcodes.ACC_INTERFACE != 0
+        )
         val analyzer = Analyzer(verifier)
         if (loader != null) {
             verifier.setClassLoader(loader)
@@ -157,5 +229,23 @@ private fun assertWellFormed(
         } catch (e: AnalyzerException) {
             throw AssertionError("Class ${classNode.name} is not well-formed", e)
         }
+    }
+}
+
+private fun Class<*>.collectSuperClasses() = buildList {
+    while (true) {
+        val self = lastOrNull() ?: this@collectSuperClasses
+        this += self.superclass ?: break
+    }
+}
+
+class BytesClassLoader(
+    private val map: Map<String, ByteArray>,
+) : ClassLoader(null) {
+    constructor(vararg pairs: Pair<String, ByteArray>) : this(mapOf(*pairs))
+
+    override fun findClass(name: String?): Class<*> {
+        val bytes = map[name] ?: throw NoSuchElementException(name)
+        return defineClass(name, bytes, 0, bytes.size)
     }
 }

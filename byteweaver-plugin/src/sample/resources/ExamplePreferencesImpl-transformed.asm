@@ -1,4 +1,4 @@
-// class version 52.0 (52)
+// class version 61.0 (61)
 // access flags 0x21
 public class ru/ok/android/prefs/FastSharedPreferences {
 
