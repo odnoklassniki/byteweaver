@@ -1,11 +1,15 @@
 pluginManagement {
     repositories {
-        maven { url 'https://art.at.odkl.ru/artifactory/at-repo' }
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+        google()
     }
 }
 dependencyResolutionManagement {
     repositories {
-        maven { url 'https://art.at.odkl.ru/artifactory/at-repo' }
+        google()
+        mavenCentral()
     }
 }
 include(':byteweaver-plugin')

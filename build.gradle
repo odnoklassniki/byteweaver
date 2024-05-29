@@ -1,14 +1,3 @@
-allprojects {
-    buildscript {
-        repositories {
-            maven { url 'https://art.at.odkl.ru/artifactory/at-repo' }
-        }
-    }
-    repositories {
-        maven { url 'https://art.at.odkl.ru/artifactory/at-repo' }
-    }
-}
-
 tasks.register('clean', Delete) {
     delete rootProject.layout.buildDirectory
 }
