@@ -1,5 +1,6 @@
 package ru.ok.byteweaver.config
 
+import java.lang.IllegalArgumentException
 import java.util.regex.Pattern
 
 sealed interface ClassPattern : TypePattern {
@@ -32,7 +33,31 @@ sealed interface ClassPattern : TypePattern {
     }
 }
 
-private object StarClassPattern : ClassPattern {
+sealed interface DeclaringClassPattern : ClassPattern {
+    val declaringJvmName: String
+
+    companion object {
+        operator fun invoke(value: String): DeclaringClassPattern {
+            require(!value.endsWith("[]"))
+
+            val indexOfStar = value.indexOf('*')
+            if (indexOfStar < 0) {
+                return ClassName(value)
+            }
+            val length = value.length
+            val lastIndexOfStar = value.lastIndexOf('*')
+            if (length == 1 || length == 2 && lastIndexOfStar == 1) {
+                return StarClassPattern
+            }
+            throw IllegalArgumentException("Only star and exact class names supported")
+        }
+    }
+}
+
+object StarClassPattern : DeclaringClassPattern {
+    override val declaringJvmName
+        get() = "java/lang/Object"
+
     override fun jvmNameMatches(name: String, startIndex: Int, endIndex: Int): Boolean {
         return startIndex < endIndex
     }

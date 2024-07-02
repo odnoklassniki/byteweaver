@@ -12,7 +12,7 @@ import ru.ok.byteweaver.util.PRIMITIVE_VOID_JAVA_NAME
 
 class ClassName(
         override val javaName: String,
-) : ClassPattern, TypeName {
+) : DeclaringClassPattern, TypeName {
     init {
         require(!javaName.endsWith("[]"))
         require(javaName != PRIMITIVE_VOID_JAVA_NAME)
@@ -28,6 +28,9 @@ class ClassName(
 
     val jvmName = javaName.replace('.', '/')
     override val jvmDesc = "L$jvmName;"
+
+    override val declaringJvmName: String
+        get() = jvmName
 
     override fun jvmNameMatches(name: String, startIndex: Int, endIndex: Int): Boolean {
         return name.regionMatches(startIndex, jvmName, 0, endIndex - startIndex)

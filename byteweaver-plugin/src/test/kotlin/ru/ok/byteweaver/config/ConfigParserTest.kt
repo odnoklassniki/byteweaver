@@ -100,7 +100,7 @@ class ConfigParserTest {
         val getSharedPreferencesCall = anyMethodBlock.callBlocks.first()
 
         assertEquals("android.content.SharedPreferences", getSharedPreferencesCall.descPattern.returnTypePattern.toString())
-        assertEquals("android.content.Context", getSharedPreferencesCall.declaringClassName.toString())
+        assertEquals("android.content.Context", getSharedPreferencesCall.declaringClassPattern.toString())
         assertEquals("getSharedPreferences", getSharedPreferencesCall.methodName.toString())
         assertEquals(2, getSharedPreferencesCall.descPattern.parameterTypePatterns.size)
         assertEquals(listOf("java.lang.String", "int"), getSharedPreferencesCall.descPattern.parameterTypePatterns.map(TypePattern::toString))

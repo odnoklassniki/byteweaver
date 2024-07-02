@@ -1,13 +1,13 @@
 package ru.ok.byteweaver.config
 
 class CallBlock(
-        val declaringClassName: ClassName,
+        val declaringClassPattern: DeclaringClassPattern,
         val methodName: LiteralName,
         val descPattern: MethodDescPattern,
         val operations: List<Operation>,
 ) {
     override fun toString() = buildString {
-        append(descPattern.returnTypePattern).append(" ").append(declaringClassName).append('.').append(methodName)
+        append(descPattern.returnTypePattern).append(" ").append(declaringClassPattern).append('.').append(methodName)
         append('(')
         var first = true
         for (parameterTypePattern in descPattern.parameterTypePatterns) {

@@ -3,6 +3,7 @@ package ru.ok.byteweaver.transform
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import ru.ok.byteweaver.config.CallBlock
+import ru.ok.byteweaver.config.DeclaringClassPattern
 import ru.ok.byteweaver.config.Operation
 
 abstract class MethodCallVisitor(
@@ -15,12 +16,12 @@ abstract class MethodCallVisitor(
 
     protected open fun transformVisitMethodInsn(
             opcode: Int,
-            declaringClassJvmName: String,
+            declaringClassPattern: DeclaringClassPattern,
             methodName: String,
             methodJvmDesc: String,
             isInterface: Boolean,
     ) {
-        super.visitMethodInsn(opcode, declaringClassJvmName, methodName, methodJvmDesc, isInterface)
+        super.visitMethodInsn(opcode, declaringClassPattern.declaringJvmName, methodName, methodJvmDesc, isInterface)
     }
 
     final override fun visitMethodInsn(
@@ -30,7 +31,7 @@ abstract class MethodCallVisitor(
             methodJvmDesc: String,
             isInterface: Boolean,
     ) {
-        val matches = callBlock.declaringClassName.jvmNameMatches(declaringClassJvmName)
+        val matches = callBlock.declaringClassPattern.jvmNameMatches(declaringClassJvmName)
                 && callBlock.methodName.nameMatches(methodName)
                 && callBlock.descPattern.jvmDescMatches(methodJvmDesc)
         if (matches) {
@@ -38,7 +39,7 @@ abstract class MethodCallVisitor(
                     && operation.methodName.nameMatches(transformLocation.methodName)
                     && composedSelfMethodJvmDescMatches(declaringClassJvmName, methodJvmDesc, transformLocation.methodJvmDesc)
             if (!matchesBack) {
-                transformVisitMethodInsn(opcode, declaringClassJvmName, methodName, methodJvmDesc, isInterface)
+                transformVisitMethodInsn(opcode, callBlock.declaringClassPattern, methodName, methodJvmDesc, isInterface)
                 return
             }
         }

@@ -159,7 +159,7 @@ private fun parseCallInfo(
 
     val declaringClassName = matcher.group(2)
             .let(imports::import)
-            .let(::ClassName)
+            .let(DeclaringClassPattern::invoke)
 
     val methodName = matcher.group(3)
             .let(::LiteralName)
@@ -183,7 +183,7 @@ private fun parseCallInfo(
     }
 
     outCallBlocks += CallBlock(
-            declaringClassName = declaringClassName,
+            declaringClassPattern = declaringClassName,
             methodName = methodName,
             descPattern = MethodDescPattern(
                     returnTypePattern = returnTypeName,
