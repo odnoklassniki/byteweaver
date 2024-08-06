@@ -4,7 +4,6 @@ import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import ru.ok.byteweaver.config.CallBlock
 import ru.ok.byteweaver.config.ClassName
-import ru.ok.byteweaver.config.DeclaringClassPattern
 import ru.ok.byteweaver.config.ForwardParameter
 import ru.ok.byteweaver.config.Op
 import ru.ok.byteweaver.config.Operation
@@ -32,7 +31,7 @@ class ReplaceCallMethodVisitor(
 
     override fun transformVisitMethodInsn(
             opcode: Int,
-            declaringClassPattern: DeclaringClassPattern,
+            selfClassJvmName: String,
             methodName: String,
             methodJvmDesc: String,
             isInterface: Boolean,
@@ -47,7 +46,7 @@ class ReplaceCallMethodVisitor(
                 operation.declaringClassName.jvmName,
                 operation.methodName.name,
                 composeSelfMethodJvmDesc(
-                        declaringClassPattern.declaringJvmName,
+                        selfClassJvmName,
                         methodJvmDesc,
                 ),
                 isInterface

@@ -3,7 +3,6 @@ package ru.ok.byteweaver.transform
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import ru.ok.byteweaver.config.CallBlock
-import ru.ok.byteweaver.config.DeclaringClassPattern
 import ru.ok.byteweaver.config.Operation
 
 abstract class MethodCallVisitor(
@@ -16,12 +15,12 @@ abstract class MethodCallVisitor(
 
     protected open fun transformVisitMethodInsn(
             opcode: Int,
-            declaringClassPattern: DeclaringClassPattern,
+            selfClassJvmName: String,
             methodName: String,
             methodJvmDesc: String,
             isInterface: Boolean,
     ) {
-        super.visitMethodInsn(opcode, declaringClassPattern.declaringJvmName, methodName, methodJvmDesc, isInterface)
+        super.visitMethodInsn(opcode, selfClassJvmName, methodName, methodJvmDesc, isInterface)
     }
 
     final override fun visitMethodInsn(
@@ -35,11 +34,14 @@ abstract class MethodCallVisitor(
                 && callBlock.methodName.nameMatches(methodName)
                 && callBlock.descPattern.jvmDescMatches(methodJvmDesc)
         if (matches) {
+            // additional checks follow to ensure we will not generate recursive code
+
+            val selfClassJvmName = callBlock.declaringClassPattern.declaringJvmName
             val matchesBack = operation.declaringClassName.jvmNameMatches(transformLocation.declaringClassJvmName)
                     && operation.methodName.nameMatches(transformLocation.methodName)
-                    && composedSelfMethodJvmDescMatches(declaringClassJvmName, methodJvmDesc, transformLocation.methodJvmDesc)
+                    && composedSelfMethodJvmDescMatches(selfClassJvmName, methodJvmDesc, transformLocation.methodJvmDesc)
             if (!matchesBack) {
-                transformVisitMethodInsn(opcode, callBlock.declaringClassPattern, methodName, methodJvmDesc, isInterface)
+                transformVisitMethodInsn(opcode, selfClassJvmName, methodName, methodJvmDesc, isInterface)
                 return
             }
         }

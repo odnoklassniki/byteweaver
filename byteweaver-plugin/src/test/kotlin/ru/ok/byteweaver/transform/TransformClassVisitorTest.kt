@@ -24,6 +24,7 @@ import org.objectweb.asm.tree.analysis.SimpleVerifier
 import org.objectweb.asm.util.CheckClassAdapter
 import org.objectweb.asm.util.Textifier
 import org.objectweb.asm.util.TraceClassVisitor
+import ru.ok.android.app.NotificationsLogger
 import ru.ok.android.prefs.FastSharedPreferences
 import ru.ok.byteweaver.config.ClassBlock
 import ru.ok.byteweaver.config.parseConfig
@@ -139,6 +140,18 @@ class TransformClassVisitorTest {
 
         val actual = asm(new)
         val expected = resource("ExampleService-transformed.asm").text()
+
+        assertWellFormed(ClassReader(new), javaClass.classLoader)
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun testNotificationsLoggerUnaffected() {
+        val old = NotificationsLogger::class.java.bytes
+        val new = NotificationsLogger::class.java.transform(classBlocks)
+
+        val actual = asm(new)
+        val expected = asm(old)
 
         assertWellFormed(ClassReader(new), javaClass.classLoader)
         assertEquals(expected, actual)
