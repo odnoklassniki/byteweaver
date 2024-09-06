@@ -4,6 +4,7 @@ import com.example.ExampleActivity
 import com.example.ExampleAutoTrace
 import com.example.ExampleCall
 import com.example.ExampleCallDelegate
+import com.example.ExampleExecutors
 import com.example.ExampleNonActivity
 import com.example.ExampleNotification
 import com.example.ExamplePreferences
@@ -39,6 +40,7 @@ class TransformClassVisitorTest {
         "example-notification.conf",
         "example-trace.conf",
         "example-preferences.conf",
+        "example-executors.conf"
     ).flatMap(::parseConfig)
 
     @Test
@@ -185,6 +187,17 @@ class TransformClassVisitorTest {
 
         val actual = asm(new)
         val expected = resource("ExampleRunnable-transformed.asm").text()
+
+        assertWellFormed(ClassReader(new), javaClass.classLoader)
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun testExecutors() {
+        val new = ExampleExecutors::class.java.transform(classBlocks)
+
+        val actual = asm(new)
+        val expected = resource("ExampleExecutors-transformed.asm").text()
 
         assertWellFormed(ClassReader(new), javaClass.classLoader)
         assertEquals(expected, actual)
