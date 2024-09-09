@@ -17,17 +17,24 @@ class ReplaceCallMethodVisitor(
         override val callBlock: CallBlock,
         override val operation: Operation,
 ) : MethodCallVisitor(api, mv) {
-    val hasFirstSelfParameter: Boolean
-
     init {
         require(operation.op == Op.REPLACE)
-        hasFirstSelfParameter = operation.parameters.isNotEmpty() && operation.parameters[0] is SelfParameter
-        val startRestParameters = if (hasFirstSelfParameter) 1 else 0
-        for (i in startRestParameters..operation.parameters.lastIndex) {
-            val parameter = operation.parameters[i]
-            check(parameter is ForwardParameter) { TODO() }
-            check(parameter.typeName == null) { TODO() }
-            check(parameter.position == i - startRestParameters) { TODO() }
+        if (callBlock.isStatic) {
+            for (i in 0..operation.parameters.lastIndex) {
+                val parameter = operation.parameters[i]
+                check(parameter is ForwardParameter) { "Should have forward parameter at position $i" }
+                check(parameter.typeName == null) { "Should have untyped forward parameter at position $i" }
+                check(parameter.position == i) { "Should have forward parameter $i at position $i" }
+            }
+        } else {
+            check(operation.parameters.isNotEmpty()) { "Should have self parameter" }
+            check(operation.parameters[0] is SelfParameter) { "Should have self parameter at position 0" }
+            for (i in 1..operation.parameters.lastIndex) {
+                val parameter = operation.parameters[i]
+                check(parameter is ForwardParameter) { "Should have forward parameter at position $i" }
+                check(parameter.typeName == null) { "Should have untyped forward parameter at position $i" }
+                check(parameter.position == i - 1) { "Should have forward parameter ${i - 1} at position $i" }
+            }
         }
     }
 
@@ -38,24 +45,25 @@ class ReplaceCallMethodVisitor(
             methodJvmDesc: String,
             isInterface: Boolean,
     ) {
+        val isMethodStatic = callBlock.isStatic
         when (opcode) {
-            Opcodes.INVOKEVIRTUAL -> check(hasFirstSelfParameter) { "Expected self parameter for invokevirtual "}
-            Opcodes.INVOKEINTERFACE -> check(hasFirstSelfParameter) { "Expected self parameter for invokeinterface "}
-            Opcodes.INVOKESTATIC -> check(!hasFirstSelfParameter) { "Expected no self parameter for invokestatic "}
+            Opcodes.INVOKEVIRTUAL -> require(!isMethodStatic) { "Expected static call for method ${callBlock.methodName}" }
+            Opcodes.INVOKEINTERFACE -> require(!isMethodStatic) { "Expected static call for method ${callBlock.methodName}" }
+            Opcodes.INVOKESTATIC -> require(isMethodStatic) { "Expected virtual call for method ${callBlock.methodName}" }
             else -> TODO()
         }
         super.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
                 operation.declaringClassName.jvmName,
                 operation.methodName.name,
-                if (hasFirstSelfParameter) {
-                    composeSelfMethodJvmDesc(
-                        selfClassJvmName,
-                        methodJvmDesc,
-                    )
-                } else {
-                    methodJvmDesc
-                },
+            if (!isMethodStatic) {
+                composeSelfMethodJvmDesc(
+                    selfClassJvmName,
+                    methodJvmDesc,
+                )
+            } else {
+                methodJvmDesc
+            },
                 isInterface
         )
     }

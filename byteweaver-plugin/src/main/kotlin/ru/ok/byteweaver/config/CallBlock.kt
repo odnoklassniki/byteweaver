@@ -1,6 +1,7 @@
 package ru.ok.byteweaver.config
 
 class CallBlock(
+        val isStatic: Boolean,
         val declaringClassPattern: DeclaringClassPattern,
         val methodName: LiteralName,
         val descPattern: MethodDescPattern,

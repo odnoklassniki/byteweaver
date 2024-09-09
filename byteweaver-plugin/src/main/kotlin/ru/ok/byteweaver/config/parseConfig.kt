@@ -141,7 +141,7 @@ private fun parseMethodInto(
     return true
 }
 
-private val CALL_PATTERN: Pattern = Pattern.compile("($TYPE_PATTERN) ($CLASS_NAME_PATTERN)\\.([^.]+)\\(((?:.+,)*.+)?\\)")
+private val CALL_PATTERN: Pattern = Pattern.compile("(static\\s+)?($TYPE_PATTERN)\\s+($CLASS_NAME_PATTERN)\\.([^.]+)\\(((?:.+,)*.+)?\\)")
 
 private fun parseCallInfo(
         statement: Statement,
@@ -153,18 +153,20 @@ private fun parseCallInfo(
         return false
     }
 
-    val returnTypeName = matcher.group(1)
+    val isStatic = matcher.group(1) != null
+
+    val returnTypeName = matcher.group(2)
             .let(imports::import)
             .let(TypeName::invoke)
 
-    val declaringClassName = matcher.group(2)
+    val declaringClassName = matcher.group(3)
             .let(imports::import)
             .let(DeclaringClassPattern::invoke)
 
-    val methodName = matcher.group(3)
+    val methodName = matcher.group(4)
             .let(::LiteralName)
 
-    val rawParams = matcher.group(4)
+    val rawParams = matcher.group(5)
             ?.split(',')
             .let { it ?: emptyList() }
 
@@ -183,6 +185,7 @@ private fun parseCallInfo(
     }
 
     outCallBlocks += CallBlock(
+            isStatic = isStatic,
             declaringClassPattern = declaringClassName,
             methodName = methodName,
             descPattern = MethodDescPattern(
