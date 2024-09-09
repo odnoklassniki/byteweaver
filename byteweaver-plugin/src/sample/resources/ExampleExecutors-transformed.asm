@@ -24,24 +24,35 @@ public class com/example/ExampleExecutors {
     POP
    L1
     LINENUMBER 9 L1
-    RETURN
+    ICONST_1
+    INVOKESTATIC com/example/ExampleExecutors.customFixedThreadPool (I)Ljava/util/concurrent/ExecutorService;
+    POP
    L2
-    LOCALVARIABLE args [Ljava/lang/String; L0 L2 0
+    LINENUMBER 10 L2
+    RETURN
+   L3
+    LOCALVARIABLE args [Ljava/lang/String; L0 L3 0
     MAXSTACK = 1
     MAXLOCALS = 1
 
   // access flags 0x9
-  // signature (Ljava/lang/Class<Ljava/util/concurrent/Executors;>;)Ljava/util/concurrent/ExecutorService;
-  // declaration: java.util.concurrent.ExecutorService customCachedThreadPool(java.lang.Class<java.util.concurrent.Executors>)
-  public static customCachedThreadPool(Ljava/lang/Class;)Ljava/util/concurrent/ExecutorService;
+  public static customCachedThreadPool()Ljava/util/concurrent/ExecutorService;
    L0
-    LINENUMBER 12 L0
+    LINENUMBER 13 L0
     INVOKESTATIC java/util/concurrent/Executors.newCachedThreadPool ()Ljava/util/concurrent/ExecutorService;
     ARETURN
+    MAXSTACK = 1
+    MAXLOCALS = 0
+
+  // access flags 0x9
+  public static customFixedThreadPool(I)Ljava/util/concurrent/ExecutorService;
+   L0
+    LINENUMBER 17 L0
+    ILOAD 0
+    INVOKESTATIC java/util/concurrent/Executors.newFixedThreadPool (I)Ljava/util/concurrent/ExecutorService;
+    ARETURN
    L1
-    LOCALVARIABLE klass Ljava/lang/Class; L0 L1 0
-    // signature Ljava/lang/Class<Ljava/util/concurrent/Executors;>;
-    // declaration: klass extends java.lang.Class<java.util.concurrent.Executors>
+    LOCALVARIABLE poolSize I L0 L1 0
     MAXSTACK = 1
     MAXLOCALS = 1
 }

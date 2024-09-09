@@ -27,7 +27,7 @@ class ReplaceCallMethodVisitor(
             val parameter = operation.parameters[i]
             check(parameter is ForwardParameter) { TODO() }
             check(parameter.typeName == null) { TODO() }
-            check(parameter.position == i - 1) { TODO() }
+            check(parameter.position == i - startRestParameters) { TODO() }
         }
     }
 
