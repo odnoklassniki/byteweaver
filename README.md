@@ -31,7 +31,7 @@ pluginManagement {
 
 ```kotlin
 plugins {
-    id("ru.ok.byteweaver").version("0.1.0-rc.1")
+    id("ru.ok.byteweaver").version("0.1.0")
 }
 ```
 
@@ -55,7 +55,7 @@ pluginManagement {
 
 ```groovy
 plugins {
-    id 'ru.ok.byteweaver' version '0.1.0-rc.1'
+    id 'ru.ok.byteweaver' version '0.1.0'
 }
 ```
 
@@ -77,7 +77,7 @@ buildscript {
         }
     }
     dependencies {
-        classpath 'ru.ok.byteweaver:byteweaver-plugin:0.1.0-rc.6'
+        classpath 'ru.ok.byteweaver:byteweaver-plugin:0.1.0'
     }
 }
 ```
