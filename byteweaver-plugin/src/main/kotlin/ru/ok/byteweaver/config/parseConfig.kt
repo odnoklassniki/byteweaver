@@ -66,7 +66,9 @@ private fun parseClassInto(
         return false
     }
 
-    val namePattern = matcher.group(1).let(ClassPattern::invoke)
+    val namePattern = matcher.group(1)
+            .let(imports::import)
+            .let(ClassPattern::invoke)
     val ancestorNames = matcher.group(2)
             ?.split(',')
             .let { it ?: emptyList() }

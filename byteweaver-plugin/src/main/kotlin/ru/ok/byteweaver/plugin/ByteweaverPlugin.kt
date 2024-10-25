@@ -4,7 +4,9 @@ package ru.ok.byteweaver.plugin
 
 import com.android.build.api.instrumentation.FramesComputationMode
 import com.android.build.api.instrumentation.InstrumentationScope
+import com.android.build.api.variant.AndroidComponentsExtension
 import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import com.android.build.api.variant.LibraryAndroidComponentsExtension
 import com.android.build.gradle.internal.utils.setDisallowChanges
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -15,25 +17,37 @@ class ByteweaverPlugin : Plugin<Project> {
         val configs = project.container(ByteweaverConfig::class.java)
         project.extensions.add("byteweaver", configs)
 
-        project.afterEvaluate {
-            afterEvaluate(project, configs)
+        project.pluginManager.withPlugin("com.android.application") {
+            val androidComponents = project.extensions.getByType(ApplicationAndroidComponentsExtension::class.java)
+
+            hook(project, androidComponents, configs)
+        }
+        project.pluginManager.withPlugin("com.android.library") {
+            val androidComponents = project.extensions.getByType(LibraryAndroidComponentsExtension::class.java)
+
+            hook(project, androidComponents, configs)
         }
     }
 
-    private fun afterEvaluate(project: Project, configs: Set<ByteweaverConfig>) {
-        val android = try {
-            project.extensions.getByType(ApplicationAndroidComponentsExtension::class.java)
-        } catch (ex: UnknownDomainObjectException) {
-            project.logger.error("Only android application projects supported", ex)
-            throw ex
-        }
-        android.onVariants { variant ->
+    private fun hook(
+        project: Project,
+        androidComponents: AndroidComponentsExtension<*, *, *>,
+        configs: Set<ByteweaverConfig>
+    ) {
+        androidComponents.onVariants { variant ->
             val srcFiles = configs
                     .filter { config ->
-                        variant.buildType == config.name || variant.productFlavors.any { it.second == config.name }
+                        when {
+                            variant.name == config.name -> true
+                            variant.flavorName == config.name -> true
+                            variant.buildType == config.name -> true
+                            variant.productFlavors.any { it.second == config.name } -> true
+                            else -> false
+                        }
                     }
                     .flatMap { it.srcFiles }
                     .map { project.file(it) }
+
             if (srcFiles.isNotEmpty()) {
                 variant.instrumentation.transformClassesWith(ByteweaverAsmClassVisitorFactory::class.java, InstrumentationScope.ALL) { parameters ->
                     parameters.srcFiles.setDisallowChanges(srcFiles)
