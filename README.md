@@ -8,9 +8,9 @@ ByteWeaver от OK.TECH это легковесное решение для ав
 
 # Обзор архитектуры ByteWeaver
 
-ByteWeaver выполнен в виде плагина для Gradle. В свою очередь ByteWeaver использует инфраструктуру Android Gradle Plugin для того, чтобы встроиться в процесс сборки андроидного приложения или библиотеки. На этапе обработки байт-кода (после компиляции и подключения транзитивных зависимостей, но до обфускации) ByteWeaver обрабатывает классы по одному согласно указанным спецификациям на языке конфигурирования ByteWeaver.
+ByteWeaver выполнен в виде плагина для Gradle. В свою очередь ByteWeaver использует инфраструктуру Android Gradle Plugin для того, чтобы встроиться в процесс сборки андроид приложения или библиотеки. На этапе обработки байт-кода (после компиляции и подключения транзитивных зависимостей, но до обфускации) ByteWeaver обрабатывает классы по одному согласно указанным спецификациям на языке конфигурирования ByteWeaver.
 
-ByteWeawer поддерживает классы, скопмилированные из Java или Kotlin, не важно, однако в случае Kotlin может потребоваться дополнительная работа, чтобы понять, какой байткод сгенерировал компилятор.
+ByteWeawer поддерживает классы, скомпилированные из Java или Kotlin, не важно, однако в случае Kotlin может потребоваться дополнительная работа, чтобы понять, какой байткод сгенерировал компилятор.
 
 # Подключение ByteWeaver к проекту
 
@@ -25,7 +25,7 @@ pluginManagement {
 }
 ```
 
-Если вы в вашем проекте уже используете [Tracer](https://apptracer.ru) то этот шаг можно пропустить.
+Если вы в вашем проекте уже используете [Tracer](https://apptracer.ru), то этот шаг можно пропустить.
 
 В вашем `<project>/<app_module>/build.gradle.kts` подключите плагин ByteWeaver актуальной версии:
 
@@ -39,7 +39,7 @@ plugins {
 
 <summary>Инструкция для Groovy</summary>
 
-Если ваши билд-скрипты написаны на Groovy то инструкция по подключению в целом такая же с поправкой на синтаксис Groovy.
+Если ваши билд-скрипты написаны на Groovy, то инструкция по подключению в целом такая же с поправкой на синтаксис Groovy.
 
 В вашем `<project>/settings.gradle` добавьте репозиторий с проектом ByteWeaver:
 ```groovy
@@ -174,7 +174,7 @@ import ru.ok.android.app.NotificationsLogger;
 import java.lang.String;
 ```
 
-Более того, импорты обязатьельны (см. `java.lang.String`). Никакого неявного импорта `java.lang.*` как в Java и кучи пакетов как в Котлине нет.
+Более того, импорты обязательны (см. `java.lang.String`). Никакого неявного импорта `java.lang.*` как в Java и кучи пакетов как в Котлине нет.
 
 ## Указание методов
 
@@ -242,7 +242,7 @@ class * {
 public class Main {
     @AutoTraceCompat
     public static void main(String[] args) {
-        System.out.println("Hellow World");
+        System.out.println("Hello World");
     }
 }
 ```
@@ -251,7 +251,7 @@ public class Main {
 public class Main {
     public static void main(String[] args) {
         TraceCompat.beginTraceSection("Main.main(String[])");
-        System.out.println("Hellow World");
+        System.out.println("Hello World");
     }
 }
 ```
@@ -260,19 +260,19 @@ public class Main {
 - Вставляется всегда вызов статической функции, при этом модификатор `static` указывать не нужно
 - Вставляется всегда вызов функции, которая ничего не возвращает, но тип `void` указывать нужно!
 - Вызываем либо функцию без параметров, либо с единственным параметром `trace`
-- Параметр `trace` имееи тип `String` и содержит имя вызывающего класса и метода (и типы параметров вызывающего метода)
+- Параметр `trace` имеет тип `String` и содержит имя вызывающего класса и метода (и типы параметров вызывающего метода)
 - Значение параметра `trace` генерируется до обработки обфускатором
 
 ## Добавление вызовов в конец метода
 
 ByteWeaver позволяет добавлять вызовы методов в конец тела ваших методов.
 
-В конец любого метода аннотированный `@AutoTraceCompat` вставить вызов метода `TraceCompat.beginSection` с параметром `trace` (о нем ниже):
+В конец любого метода аннотированного `@AutoTraceCompat` вставить вызов метода `TraceCompat.endTraceSection`
 ```
 class * {
     @ru.ok.android.commons.os.AutoTraceCompat
     * *(***) {
-        after void TraceCompat.beginTraceSection(trace);
+        after void TraceCompat.endTraceSection();
     }
 }
 ```
@@ -298,11 +298,56 @@ public class Main {
    }
 }
 ```
+При необходимости в конец метода можно добавить код, использующий параметр`trace` :
+```
+class * {
+    @ru.ok.android.commons.os.AutoTraceCompat
+    * *(***) {
+        after void SomeLogger.logAfter(trace);
+    }
+}
+```
 
-Как ByteWeaver вставляет вызовы в начало методов:
+Это примерно эквивалентно, как если бы вы вручную переписали класс:
+```java
+public class Main {
+    @AutoTraceCompat
+    public static void main(String[] args) {
+        System.out.println();
+    }
+}
+```
+... получили бы:
+```java
+public class Main {
+    public static void main(String[] args) {
+        try {
+            System.out.println("Hello World");
+        } finally {
+            SomeLogger.logAfter("Main.main(String[])");
+        }
+   }
+}
+```
+При этом класс SomeLogger должен выглядеть как-то так:
+```java
+public class SomeLogger {
+    private static final String AFTER_PREFIX = "AFTER: ";
+
+    private static void log(String tag, String msg) {
+        System.out.println(tag + " " + msg);
+    }
+
+    public static void logAfter(String msg) {
+        log(AFTER_PREFIX, msg);
+    }
+}
+```
+
+Как ByteWeaver вставляет вызовы в конец методов:
 - Вставляется всегда вызов статической функции, при этом модификатор `static` указывать не нужно
-- Вставляется всегда вызов функции, которая ничегно не возвращает, но тип `void` указывать нужно!
-- Вызываем строго функцию без параметров
+- Вставляется всегда вызов функции, которая ничего не возвращает, но тип `void` указывать нужно!
+- Вызываем строго функцию без параметров, либо с параметром `trace`
 - Вызов будет осуществлен вне зависимости от того, нормально или аварийно завершится вызывающий метод
 
 ## Замена вызовов методов другими

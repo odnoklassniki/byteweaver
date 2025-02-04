@@ -31,7 +31,10 @@ class MethodBodyVisitor(
 
                 Op.AFTER -> {
                     check(operation.returnTypeName.jvmDesc == VOID_JVM_DESC)
-                    check(operation.parameters.isEmpty())
+                    if (operation.parameters.isNotEmpty()) {
+                        check(operation.parameters.size == 1)
+                        check(operation.parameters.first() == TraceParameter)
+                    }
                 }
 
                 Op.REPLACE -> TODO("Replacing method body not yet supported")
@@ -159,11 +162,20 @@ class MethodBodyVisitor(
             if (operation.op != Op.AFTER) {
                 continue
             }
+            val methodJvmDesc = when {
+                operation.parameters.isEmpty() -> "()V"
+                else -> "(Ljava/lang/String;)V"
+            }
+            if (operation.parameters.isNotEmpty()) {
+                assert(operation.parameters.size == 1)
+                assert(operation.parameters.first() == TraceParameter)
+                super.visitLdcInsn(composeTraceString())
+            }
             super.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
                 operation.declaringClassName.jvmName,
                 operation.methodName.name,
-                "()V",
+                methodJvmDesc,
                 false,
             )
         }
