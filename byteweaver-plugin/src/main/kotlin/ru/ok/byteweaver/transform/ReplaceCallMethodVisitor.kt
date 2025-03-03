@@ -10,7 +10,7 @@ import ru.ok.byteweaver.config.Operation
 import ru.ok.byteweaver.config.SelfParameter
 
 class ReplaceCallMethodVisitor(
-        api: Int = Opcodes.ASM6,
+        api: Int,
         mv: MethodVisitor?,
         override val transformLocation: TransformLocation,
         private val checkAncestorNames: List<ClassName>?,

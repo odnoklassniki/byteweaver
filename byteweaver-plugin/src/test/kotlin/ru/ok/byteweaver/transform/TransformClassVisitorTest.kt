@@ -1,5 +1,6 @@
 package ru.ok.byteweaver.transform
 
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import com.example.ExampleActivity
 import com.example.ExampleAutoTrace
 import com.example.ExampleCall
@@ -40,7 +41,8 @@ class TransformClassVisitorTest {
         "example-notification.conf",
         "example-trace.conf",
         "example-preferences.conf",
-        "example-executors.conf"
+        "example-executors.conf",
+        "example-exoplayer.conf",
     ).flatMap(::parseConfig)
 
     @Test
@@ -202,6 +204,17 @@ class TransformClassVisitorTest {
         assertWellFormed(ClassReader(new), javaClass.classLoader)
         assertEquals(expected, actual)
     }
+
+    @Test
+    fun testExoplayer() {
+        val new = DefaultAudioSink.Builder::class.java.transform(classBlocks)
+
+        val actual = asm(new)
+        val expected = resource("DefaultAudioSink\$Builder-transformed.asm").text()
+
+        assertWellFormed(ClassReader(new), javaClass.classLoader)
+        assertEquals(expected, actual)
+    }
 }
 
 private fun parseConfig(name: String) = resource(name)
@@ -220,7 +233,7 @@ private fun Class<*>.transform(
     val cr = ClassReader(bytes)
     val cw = ClassWriter(cr, 0x0)
     val cv = TransformClassVisitor(
-        Opcodes.ASM6,
+        Opcodes.ASM7,
         cw,
         classBlocks,
         knownSuperClassJavaNames = knownSuperClassJavaNames,

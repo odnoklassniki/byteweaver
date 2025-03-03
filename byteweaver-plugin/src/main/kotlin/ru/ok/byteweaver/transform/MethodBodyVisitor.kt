@@ -4,14 +4,17 @@ import org.objectweb.asm.Label
 import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import ru.ok.byteweaver.config.ClassName
+import ru.ok.byteweaver.config.ForwardParameter
 import ru.ok.byteweaver.config.Op
 import ru.ok.byteweaver.config.Operation
+import ru.ok.byteweaver.config.ThisParameter
 import ru.ok.byteweaver.config.TraceParameter
 import ru.ok.byteweaver.util.THROWABLE_JVM_NAME
 import ru.ok.byteweaver.util.VOID_JVM_DESC
+import kotlin.math.max
 
 class MethodBodyVisitor(
-    api: Int = Opcodes.ASM6,
+    api: Int = Opcodes.ASM7,
     mv: MethodVisitor,
     override val transformLocation: TransformLocation,
     private val operations: List<Operation>,
@@ -23,9 +26,8 @@ class MethodBodyVisitor(
             when (operation.op) {
                 Op.BEFORE -> {
                     check(operation.returnTypeName.jvmDesc == VOID_JVM_DESC)
-                    if (operation.parameters.isNotEmpty()) {
-                        check(operation.parameters.size == 1)
-                        check(operation.parameters.first() == TraceParameter)
+                    if (transformLocation.access and Opcodes.ACC_STATIC == Opcodes.ACC_STATIC) {
+                        check(operation.parameters.none { it is ThisParameter })
                     }
                 }
 
@@ -97,9 +99,24 @@ class MethodBodyVisitor(
             visitBefore()
             super.visitJumpInsn(Opcodes.GOTO, labelStart)
         }
+        @Suppress("NAME_SHADOWING")
+        var maxStack = maxStack
+
+        maxStack = max(maxStack, 1)
+        if (!checkAncestorNames.isNullOrEmpty()) {
+            maxStack = max(maxStack, 2)
+        }
+        for (operation in operations) {
+            when (operation.op) {
+                Op.BEFORE, Op.AFTER -> {
+                    maxStack = max(maxStack, operation.parameters.size)
+                }
+                Op.REPLACE -> {} // max stack already allocated
+            }
+        }
         super.visitMaxs(
-            maxStack.coerceAtLeast(1 + if (checkAncestorNames.isNullOrEmpty()) 0 else 1),
-            maxLocals
+            maxStack,
+            maxLocals,
         )
     }
 
@@ -121,14 +138,51 @@ class MethodBodyVisitor(
             if (operation.op != Op.BEFORE) {
                 continue
             }
-            val methodJvmDesc = when {
-                operation.parameters.isEmpty() -> "()V"
-                else -> "(Ljava/lang/String;)V"
+            val parameterTypeJvmDescs = buildList {
+                for (parameter in operation.parameters) {
+                    this += when (parameter) {
+                        is TraceParameter -> "Ljava/lang/String;"
+                        is ThisParameter -> "L" + transformLocation.declaringClassJvmName + ";"
+                        is ForwardParameter -> extractParameterJvmName(
+                            transformLocation.methodJvmDesc,
+                            parameter.position
+                        )
+                        else -> TODO()
+                    }
+                }
             }
-            if (operation.parameters.isNotEmpty()) {
-                assert(operation.parameters.size == 1)
-                assert(operation.parameters.first() == TraceParameter)
-                super.visitLdcInsn(composeTraceString())
+            val methodJvmDesc = buildString {
+                append("(")
+                parameterTypeJvmDescs.forEach {
+                    append(it)
+                }
+                append(")V")
+            }
+            for (i in operation.parameters.indices) {
+                when (val parameter = operation.parameters[i]) {
+                    is TraceParameter -> {
+                        super.visitLdcInsn(composeTraceString())
+                    }
+                    is ThisParameter -> {
+                        super.visitVarInsn(Opcodes.ALOAD, 0)
+                    }
+                    is ForwardParameter -> {
+                        val index = when {
+                            transformLocation.access and Opcodes.ACC_STATIC == Opcodes.ACC_STATIC -> parameter.position
+                            else -> parameter.position + 1
+                        }
+                        val opcode = when (parameterTypeJvmDescs[i].first()) {
+                            'B', 'S', 'I', 'Z', 'C' -> Opcodes.ILOAD
+                            'J' -> Opcodes.LLOAD
+                            'F' -> Opcodes.DLOAD
+                            'D' -> Opcodes.DLOAD
+                            'L', '[' -> Opcodes.ALOAD
+                            else -> throw IllegalArgumentException()
+                        }
+                        super.visitVarInsn(opcode, index)
+                    }
+                    else -> TODO()
+                }
             }
             super.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
@@ -203,6 +257,30 @@ class MethodBodyVisitor(
         } else {
             append("(Unknown Source)")
         }
+    }
+
+    private fun extractParameterJvmName(methodJvmDesc: String, position: Int): String {
+        var pos = position
+        var startIndex = 1
+        while (true) {
+            val endIndex = when (methodJvmDesc[startIndex]) {
+                ')' -> throw IndexOutOfBoundsException("No parameter at position $position")
+                else -> methodJvmDesc.indexOfEndDesc(startIndex)
+            }
+            if (pos == 0) {
+                return methodJvmDesc.substring(startIndex, endIndex)
+            }
+
+            startIndex = endIndex
+            pos -= 1
+        }
+    }
+
+    private fun String.indexOfEndDesc(startIndex: Int = 0): Int = when (get(startIndex)) {
+        in "BSIJZCFD" -> startIndex + 1
+        '[' -> indexOfEndDesc(startIndex + 1)
+        'L' -> indexOf(';', startIndex = startIndex) + 1
+        else -> throw IllegalArgumentException(this)
     }
 
     companion object {

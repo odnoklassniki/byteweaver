@@ -95,6 +95,7 @@ class TransformClassVisitor(
                 interfaceJvmNames = interfaceJvmNames,
                 knownSuperClassJavaNames = knownSuperClassJavaNames,
                 knownInterfaceJavaNames = knownInterfaceJavaNames,
+                access = access,
                 methodName = name,
                 methodJvmDesc = jvmDesc,
                 fileName = fileName,
@@ -105,7 +106,7 @@ class TransformClassVisitor(
     }
 
     private class FilterMethodVisitor(
-            api: Int = Opcodes.ASM6,
+            api: Int,
             mv: MethodVisitor,
             val transformLocation: TransformLocation,
             val methodBlocks: List<MethodBlock>,

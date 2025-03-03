@@ -1,12 +1,11 @@
 package ru.ok.byteweaver.transform
 
 import org.objectweb.asm.MethodVisitor
-import org.objectweb.asm.Opcodes
 import ru.ok.byteweaver.config.CallBlock
 import ru.ok.byteweaver.config.Operation
 
 abstract class MethodCallVisitor(
-        api: Int = Opcodes.ASM6,
+        api: Int,
         mv: MethodVisitor?,
 ) : TransformMethodVisitor(api, mv) {
     abstract val callBlock: CallBlock

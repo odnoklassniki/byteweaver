@@ -9,6 +9,7 @@ data class TransformLocation(
         val interfaceJvmNames: Array<out String>?,
         val knownSuperClassJavaNames: List<String>?,
         val knownInterfaceJavaNames: List<String>?,
+        val access: Int,
         val methodName: String,
         val methodJvmDesc: String,
         val fileName: String?,

@@ -7,6 +7,7 @@ sealed class Parameter {
 
     companion object {
         operator fun invoke(value: String) = when (value) {
+            "this" -> ThisParameter
             "self" -> SelfParameter
             "trace" -> TraceParameter
             else -> {
@@ -21,6 +22,11 @@ sealed class Parameter {
             }
         }
     }
+}
+
+object ThisParameter : Parameter() {
+    override val name get() = "this"
+    override fun toString() = name
 }
 
 object SelfParameter : Parameter() {
