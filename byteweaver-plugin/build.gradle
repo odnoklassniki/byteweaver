@@ -1,11 +1,12 @@
 plugins {
     id 'java-gradle-plugin'
     id 'maven-publish'
+    id 'signing'
     id 'org.jetbrains.kotlin.jvm' version '1.9.22'
 }
 
 group 'ru.ok.byteweaver'
-version '1.1.0-rc.1'
+version rootProject['byteweaver.version']
 
 gradlePlugin {
     plugins {
@@ -41,19 +42,76 @@ sourceSets.test {
     resources.srcDirs += 'src/sample/resources'
 }
 
+tasks.register('javadocJar', Jar) {
+    archiveClassifier = 'javadoc'
+}
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
 publishing {
     repositories {
-        def propUrl = System.getenv("MAVEN_PUBLISH_REPO_URL")
-        def propUsername = System.getenv("MAVEN_PUBLISH_USERNAME")
-        def propPassword = System.getenv("MAVEN_PUBLISH_PASSWORD")
+        def propUrl = System.getenv('MAVEN_PUBLISH_REPO_URL')
+
         if (propUrl != null) {
             maven {
                 url = uri(propUrl)
-                credentials {
-                    username = propUsername
-                    password = propPassword
+
+                def propUsername = System.getenv('MAVEN_PUBLISH_USERNAME')
+                def propPassword = System.getenv('MAVEN_PUBLISH_PASSWORD')
+
+                if (propUsername != null && propPassword != null) {
+                    credentials {
+                        username = propUsername
+                        password = propPassword
+                    }
                 }
             }
+        }
+    }
+
+    publications {
+        configureEach {
+            pom.withXml {
+                def root = it.asNode()
+                root.appendNode('name', "${project.group}:${project.name}")
+                root.appendNode('description', 'ByteWeaver is simple tool for build-time bytecode manipulation.')
+            }
+            pom {
+                url = 'https://github.com/odnoklassniki/byteweaver'
+                licenses {
+                    license {
+                        name = 'Apache License, Version 2.0'
+                        url = 'https://github.com/odnoklassniki/byteweaver/blob/master/LICENSE.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        name = 'Alexander Asanov'
+                        email = 'alexander.asanov@corp.mail.ru'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/odnoklassniki/byteweaver.git'
+                    developerConnection = 'scm:git:https://github.com/odnoklassniki/byteweaver.git'
+                    url = 'https://github.com/odnoklassniki/byteweaver'
+                }
+            }
+        }
+    }
+}
+
+signing {
+    def signingKey = rootProject.findProperty('signingKey')
+    def signingPassword = rootProject.findProperty('signingPassword')
+
+    if (signingKey != null && signingPassword != null) {
+        useInMemoryPgpKeys(signingKey, signingPassword)
+        afterEvaluate {
+            sign(publishing.publications.pluginMaven)
+            sign(publishing.publications.simplePluginPluginMarkerMaven)
         }
     }
 }

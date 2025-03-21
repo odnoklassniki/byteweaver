@@ -20,7 +20,7 @@ ByteWeawer поддерживает классы, скомпилированны
 pluginManagement {
     repositories {
         // здесь другие репозитории c вашими зависимостями
-        maven { setUrl("https://artifactory-external.vkpartner.ru/artifactory/maven/") }
+        mavenCentral()
     }
 }
 ```
@@ -46,7 +46,7 @@ plugins {
 pluginManagement {
     repositories {
         // другие репозитории c вашими зависимостями
-        maven { url 'https://artifactory-external.vkpartner.ru/artifactory/maven/' }
+        mavenCentral()
     }
 }
 ```
@@ -72,9 +72,7 @@ plugins {
 ```groovy
 buildscript {
     repositories {
-        maven {
-            url "https://artifactory-external.vkpartner.ru/artifactory/maven/"
-        }
+        mavenCentral()
     }
     dependencies {
         classpath 'ru.ok.byteweaver:byteweaver-plugin:1.0.0'
